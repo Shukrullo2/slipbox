@@ -21,7 +21,7 @@ export function openapiSpec(serverUrl) {
       '/api/notes': {
         get: {
           summary: 'Search and filter notes, or fetch one note with ?id=',
-          description: 'With `id`: the full note plus `links`, `backlinks` and `unresolved` link targets. Otherwise a page of brief notes.',
+          description: 'With `id`: the full note plus `links` and `backlinks` (notes), `words` (dictionary entries it links to) and `unresolved` link targets. Otherwise a page of brief notes.',
           parameters: [
             { ...id, required: false },
             { name: 'q', in: 'query', description: 'Keywords; ranks by relevance', schema: { type: 'string' } },
@@ -92,7 +92,7 @@ export function openapiSpec(serverUrl) {
             { name: 'word', in: 'query', description: 'Look up by the word itself, case-insensitive', schema: { type: 'string' } },
             { name: 'q', in: 'query', description: 'Keywords; matches the word, relations, definition, example, translation', schema: { type: 'string' } },
             { name: 'field', in: 'query', schema: { type: 'string' } },
-            { name: 'pos', in: 'query', schema: { enum: ['noun', 'verb', 'adjective', 'adverb', 'phrase', 'abbreviation', 'other'] } },
+            { name: 'pos', in: 'query', schema: { enum: ['noun', 'verb', 'adjective', 'adverb', 'pronoun', 'preposition', 'particle', 'phrase', 'abbreviation', 'other'] } },
             { name: 'language', in: 'query', description: 'ISO code of the language the word is in', schema: { type: 'string' } },
             { name: 'letter', in: 'query', description: 'First letter', schema: { type: 'string', maxLength: 1 } },
             { name: 'due', in: 'query', schema: { type: 'boolean' } },
@@ -237,7 +237,7 @@ export function openapiSpec(serverUrl) {
           required: ['word', 'definition'],
           properties: {
             word: { type: 'string', maxLength: 100 },
-            pos: { enum: ['noun', 'verb', 'adjective', 'adverb', 'phrase', 'abbreviation', 'other'], default: 'other' },
+            pos: { enum: ['noun', 'verb', 'adjective', 'adverb', 'pronoun', 'preposition', 'particle', 'phrase', 'abbreviation', 'other'], default: 'other' },
             definition: { type: 'string', description: 'Plain-language meaning, one or two sentences' },
             example: { type: 'string', description: 'A sentence that uses the word' },
             language: { type: 'string', description: 'ISO code of the language the word is in; default en' },

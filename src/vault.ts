@@ -34,7 +34,10 @@ export interface VaultIndex {
   notesByDomain: Map<string, Note[]>;
   outLinks: Map<string, string[]>;
   backLinks: Map<string, string[]>;
+  /** Link targets that match neither a note nor a dictionary word. */
   unresolved: Map<string, string[]>;
+  /** Dictionary words each note links to with [[word]]. */
+  wordsLinkedFrom: Map<string, Word[]>;
   reviews: Record<string, number>;
   resolve: (target: string) => Note | undefined;
   /** Notes first, then dictionary words, so [[idempotent]] in a note opens the entry. */
@@ -74,7 +77,7 @@ export function buildIndex(data: VaultData): VaultIndex {
   const { notes, domains, today } = data;
   const words = [...(data.words ?? [])].sort((a, b) => a.word.localeCompare(b.word, undefined, { sensitivity: 'base' }));
   const noteById = new Map(notes.map((n) => [n.id, n]));
-  const { resolve, out: outLinks, back: backLinks, unresolved } = linkGraph(notes);
+  const { resolve, out: outLinks, back: backLinks, unresolved: unresolvedAll } = linkGraph(notes);
 
   const domainBySlug = new Map(domains.map((d) => [d.slug, d]));
   const childDomains = new Map<string, Domain[]>();
@@ -144,6 +147,22 @@ export function buildIndex(data: VaultData): VaultIndex {
   const wordLinks = makeResolver(words.map((w) => ({ id: w.id, basename: w.basename, title: w.word, aliases: [] as string[], w })));
   const resolveLink = (target: string) => resolve(target) ?? wordLinks(target)?.w;
 
+  // A [[link]] to a dictionary word is resolved, not missing.
+  const unresolved = new Map<string, string[]>();
+  const wordsLinkedFrom = new Map<string, Word[]>();
+  for (const [id, targets] of unresolvedAll) {
+    const missing: string[] = [];
+    const linked: Word[] = [];
+    for (const t of targets) {
+      const w = wordLinks(t)?.w;
+      if (w) {
+        if (!linked.includes(w)) linked.push(w);
+      } else missing.push(t);
+    }
+    unresolved.set(id, missing);
+    if (linked.length) wordsLinkedFrom.set(id, linked);
+  }
+
   const mentionCache = new Map<string, Note[]>();
   const mentionsOf = (word: Word) => {
     const hit = mentionCache.get(word.id);
@@ -194,6 +213,7 @@ export function buildIndex(data: VaultData): VaultIndex {
     outLinks,
     backLinks,
     unresolved,
+    wordsLinkedFrom,
     reviews: data.reviews,
     resolve,
     resolveLink,

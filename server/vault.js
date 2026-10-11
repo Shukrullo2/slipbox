@@ -16,7 +16,7 @@ const FM_RE = /^---\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/;
 const ACRONYMS = new Set(['sql', 'css', 'html', 'api', 'aws', 'gcp', 'ml', 'ai', 'llm', 'ci', 'cd', 'dns', 'http', 'jvm', 'k8s', 'ui', 'ux', 'etl', 'orm', 'os']);
 
 export const LIMITS = { title: 200, field: 1000, body: 200_000, domains: 8, tags: 20, word: 100, relations: 20 };
-export const PARTS_OF_SPEECH = ['noun', 'verb', 'adjective', 'adverb', 'phrase', 'abbreviation', 'other'];
+export const PARTS_OF_SPEECH = ['noun', 'verb', 'adjective', 'adverb', 'pronoun', 'preposition', 'particle', 'phrase', 'abbreviation', 'other'];
 const WORDS_DIR = 'words';
 
 export class HttpError extends Error {
@@ -500,10 +500,13 @@ export class Vault {
 
   /** One note plus what it links to, what links to it, and links with no note yet. */
   async noteDetail(id) {
-    const { notes } = await this.load();
+    const { notes, words } = await this.load();
     const note = notes.find((n) => n.id === id);
     if (!note) throw new HttpError(404, `No note with id "${id}"`);
     const graph = linkGraph(notes);
+    const wordByText = new Map(words.flatMap((w) => [[foldText(w.word), w], [foldText(w.basename), w]]));
+    const unresolvedAll = graph.unresolved.get(id) ?? [];
+    const linkedWords = [...new Set(unresolvedAll.map((t) => wordByText.get(foldText(t))).filter(Boolean))];
     const ref = (nid) => {
       const n = notes.find((x) => x.id === nid);
       return { id: nid, title: n?.title };
@@ -512,7 +515,8 @@ export class Vault {
       ...note,
       links: (graph.out.get(id) ?? []).map(ref),
       backlinks: (graph.back.get(id) ?? []).map(ref),
-      unresolved: graph.unresolved.get(id) ?? [],
+      unresolved: unresolvedAll.filter((t) => !wordByText.has(foldText(t))),
+      words: linkedWords.map((w) => ({ id: w.id, word: w.word })),
     };
   }
 

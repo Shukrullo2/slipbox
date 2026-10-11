@@ -105,7 +105,7 @@ curl -sS --fail-with-body -K ~/.config/slipbox/curl.cfg -X POST "{{SLIPBOX_URL}}
 type: word
 word: idempotent
 language: en                   # ISO code of the word's language: en, uz, ru, ar, tr, …
-pos: adjective                 # noun | verb | adjective | adverb | phrase | abbreviation | other
+pos: adjective                 # noun | verb | adjective | adverb | pronoun | preposition | particle | phrase | abbreviation | other
 fields: [api-design]
 definition: "Gives the same result no matter how many times it is applied."
 example: "PUT is idempotent: sending the same request twice leaves the resource unchanged."

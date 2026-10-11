@@ -109,7 +109,7 @@ When the user wants to add, define or look up a word or term ("add idempotent to
 type: word
 word: idempotent
 language: en                        # the language the word is in: en, uz, ru, ar, tr, de, fr, … (ISO code)
-pos: adjective                      # noun | verb | adjective | adverb | phrase | abbreviation | other
+pos: adjective                      # noun | verb | adjective | adverb | pronoun | preposition | particle | phrase | abbreviation | other
 fields: [api-design]                # topic slugs; optional
 definition: "Gives the same result no matter how many times it is applied."
 example: "PUT is idempotent: sending the same request twice leaves the resource unchanged."

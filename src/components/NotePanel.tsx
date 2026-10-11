@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Inline, Markdown } from './Markdown';
 import { Icon } from './Icon';
+import { textProps } from '../script';
 import { NoteForm, draftToInput, type Draft } from './NoteForm';
 import type { VaultIndex } from '../vault';
 import type { Note, NoteInput, Reviewable } from '../types';
-import { inkColor, type Theme } from '../palette';
+import { inkColor, posColor, type Theme } from '../palette';
 import { daysBetween, formatInterval } from '../../shared/srs.js';
 
 interface Props {
@@ -90,6 +91,7 @@ export function NotePanel(props: Props) {
   const backlinks = (index.backLinks.get(note.id) ?? []).map((id) => index.noteById.get(id)).filter(Boolean) as Note[];
   const outlinks = (index.outLinks.get(note.id) ?? []).map((id) => index.noteById.get(id)).filter(Boolean) as Note[];
   const missing = index.unresolved.get(note.id) ?? [];
+  const linkedWords = index.wordsLinkedFrom.get(note.id) ?? [];
 
   const related = useMemo(() => relatedNotes(note, index, [...backlinks, ...outlinks]), [note, index]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -194,7 +196,7 @@ export function NotePanel(props: Props) {
               </section>
             )}
 
-            {(backlinks.length > 0 || outlinks.length > 0 || missing.length > 0 || related.length > 0) && (
+            {(backlinks.length > 0 || outlinks.length > 0 || missing.length > 0 || related.length > 0 || linkedWords.length > 0) && (
               <div className="connections">
                 {backlinks.length > 0 && (
                   <section>
@@ -206,6 +208,18 @@ export function NotePanel(props: Props) {
                   <section>
                     <h2>Links to</h2>
                     <ul>{outlinks.map(noteLink)}</ul>
+                  </section>
+                )}
+                {linkedWords.length > 0 && (
+                  <section>
+                    <h2>Dictionary</h2>
+                    <div className="chips">
+                      {linkedWords.map((w) => (
+                        <a key={w.id} className="chip" href={`#/dictionary?word=${encodeURIComponent(w.id)}`} title={w.definition} style={{ ['--chip' as string]: posColor(w.pos, theme) }}>
+                          <span {...textProps(w.word, w.language)}>{w.word}</span>
+                        </a>
+                      ))}
+                    </div>
                   </section>
                 )}
                 {missing.length > 0 && (

@@ -168,7 +168,7 @@ def main():
     p = sub.add_parser("words", help="search the dictionary")
     p.add_argument("query", nargs="?", default="")
     p.add_argument("--field")
-    p.add_argument("--pos", choices=["noun", "verb", "adjective", "adverb", "phrase", "abbreviation", "other"])
+    p.add_argument("--pos", choices=["noun", "verb", "adjective", "adverb", "pronoun", "preposition", "particle", "phrase", "abbreviation", "other"])
     p.add_argument("--language", help="ISO code of the language the word is in, e.g. uz")
     p.add_argument("--letter")
     p.add_argument("--limit", type=int, default=20)

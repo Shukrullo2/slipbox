@@ -544,6 +544,10 @@ textarea[lang='ar'] {
   font-weight: 650;
   line-height: 22px;
 }
+a.chip {
+  text-decoration: none;
+}
+a.chip:hover,
 button.chip:hover {
   border-color: var(--chip);
 }

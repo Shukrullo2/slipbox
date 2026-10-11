@@ -2,8 +2,8 @@ export type Grade = 'again' | 'hard' | 'good' | 'easy';
 
 export type ReviewState = { due?: string; interval?: number; ease?: number; count?: number } | false;
 
-export type PartOfSpeech = 'noun' | 'verb' | 'adjective' | 'adverb' | 'phrase' | 'abbreviation' | 'other';
-export const PARTS_OF_SPEECH: PartOfSpeech[] = ['noun', 'verb', 'adjective', 'adverb', 'phrase', 'abbreviation', 'other'];
+export type PartOfSpeech = 'noun' | 'verb' | 'adjective' | 'adverb' | 'pronoun' | 'preposition' | 'particle' | 'phrase' | 'abbreviation' | 'other';
+export const PARTS_OF_SPEECH: PartOfSpeech[] = ['noun', 'verb', 'adjective', 'adverb', 'pronoun', 'preposition', 'particle', 'phrase', 'abbreviation', 'other'];
 
 /** A dictionary entry: a word or term, its meaning, and how it relates to other words. */
 export interface Word {
