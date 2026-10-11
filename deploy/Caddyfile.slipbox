@@ -1,0 +1,7 @@
+
+# Slipbox notes: a separate app in /opt/slipbox (container "slipbox" on this network).
+# Replace notes.example.com with your hostname.
+notes.example.com {
+	encode zstd gzip
+	reverse_proxy slipbox:4747
+}

@@ -1,0 +1,9 @@
+node_modules
+dist
+vault/.trash
+vault/.slipbox
+.DS_Store
+.env
+*.local
+deploy/deploy.env
+CLAUDE.local.md

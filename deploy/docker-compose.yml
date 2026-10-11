@@ -1,0 +1,24 @@
+# Slipbox on a server that already runs a reverse proxy in Docker. The container
+# joins the proxy's network (SLIPBOX_PROXY_NETWORK) so the proxy can reach it as
+# slipbox:4747; nothing is published on the host. Variables come from the server's
+# .env: docker compose --env-file .env -f deploy/docker-compose.yml up -d
+name: slipbox
+services:
+  slipbox:
+    build: ..
+    image: slipbox:latest
+    container_name: slipbox
+    restart: unless-stopped
+    env_file: ../.env
+    environment:
+      TZ: ${SLIPBOX_TZ:-UTC}
+    volumes:
+      - /var/lib/slipbox/vault:/data/vault
+    networks: [proxy]
+    mem_limit: 256m
+    cpus: 0.5
+
+networks:
+  proxy:
+    name: ${SLIPBOX_PROXY_NETWORK:?Set SLIPBOX_PROXY_NETWORK in /opt/slipbox/.env to the reverse proxy's Docker network}
+    external: true

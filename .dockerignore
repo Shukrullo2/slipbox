@@ -1,0 +1,9 @@
+node_modules
+vault
+.env
+.claude
+.git
+src
+public
+deploy
+scripts
