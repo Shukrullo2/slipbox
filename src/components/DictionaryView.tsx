@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Icon } from './Icon';
 import { WordWheel } from './WordWheel';
-import { textProps } from '../script';
 import type { VaultIndex } from '../vault';
 import { PARTS_OF_SPEECH, type PartOfSpeech, type Word } from '../types';
 import { posColor, type Theme } from '../palette';
+import { textProps } from '../script';
+import { daysBetween } from '../../shared/srs.js';
 
 interface Props {
   index: VaultIndex;
@@ -17,38 +18,51 @@ interface Props {
   onBackground: () => void;
 }
 
+type ListMode = 'off' | 'side' | 'full';
+type SortKey = 'word' | 'translation' | 'created' | 'review';
+
 const initial = (w: Word) => (w.word[0] ?? '#').toLocaleUpperCase();
 const wide = () => window.matchMedia('(min-width: 900px)').matches;
+const ALL = 'all';
 
-/** A yes/no preference remembered per device; the default depends on screen size. */
-function usePref(key: string, fallback: boolean) {
-  const [value, setValue] = useState(() => {
+/** A preference remembered per device. */
+function usePref<T extends string>(key: string, fallback: T, allowed: readonly T[]) {
+  const [value, setValue] = useState<T>(() => {
     try {
-      const v = localStorage.getItem(key);
-      return v === null ? fallback : v === '1';
+      const v = localStorage.getItem(key) as T | null;
+      return v && allowed.includes(v) ? v : fallback;
     } catch {
       return fallback;
     }
   });
   useEffect(() => {
     try {
-      localStorage.setItem(key, value ? '1' : '0');
+      localStorage.setItem(key, value);
     } catch {}
   }, [key, value]);
   return [value, setValue] as const;
 }
 
 /**
- * The dictionary: the word wheel fills the view; filters and the list are
- * panels you open when you need them. The letters inside the ring are the index.
+ * The dictionary: the word wheel fills the view, and filters and the list are
+ * panels. The list can sit beside the wheel or take the whole view as a table.
  */
 export function DictionaryView({ index, theme, selectedWord, field, onOpenWord, onSetField, onNewWord, onBackground }: Props) {
   const [query, setQuery] = useState('');
   const [posFilter, setPosFilter] = useState<Set<PartOfSpeech>>(new Set());
   const [letter, setLetter] = useState<string | null>(null);
   const [language, setLanguage] = useState<string | null>(null);
-  const [filtersOpen, setFiltersOpen] = usePref('slipbox:dict-filters', wide());
-  const [listOpen, setListOpen] = usePref('slipbox:dict-list', wide());
+  const [filtersOpen, setFiltersOpen] = usePref<'1' | '0'>('slipbox:dict-filters', wide() ? '1' : '0', ['1', '0']);
+  const [listMode, setListMode] = usePref<ListMode>('slipbox:dict-list-mode', wide() ? 'side' : 'off', ['off', 'side', 'full']);
+  const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 }>({ key: 'word', dir: 1 });
+
+  const { targets, byCode } = index.languages;
+  // Translation languages to offer: the user's targets, plus any language entries already have.
+  const translationLangs = useMemo(() => {
+    const present = new Set(index.words.flatMap((w) => Object.keys(w.translations)));
+    return [...new Set([...targets, ...present])];
+  }, [index, targets]);
+  const [translationLang, setTranslationLang] = usePref<string>('slipbox:dict-translation', translationLangs[0] ?? 'en', [...translationLangs, ALL]);
 
   const inField = useMemo(() => (field ? index.words.filter((w) => w.fields.includes(field)) : index.words), [index, field]);
   const inLanguage = useMemo(() => (language ? inField.filter((w) => w.language === language) : inField), [inField, language]);
@@ -73,6 +87,37 @@ export function DictionaryView({ index, theme, selectedWord, field, onOpenWord, 
   const shownIds = useMemo(() => new Set(shown.map((w) => w.id)), [shown]);
   const edges = useMemo(() => index.wordEdges.filter((e) => shownIds.has(e.source) && shownIds.has(e.target)), [index, shownIds]);
 
+  /** The translation shown for a word in the chosen language; null when the word is already in it. */
+  const translationOf = (w: Word): string | null => {
+    if (translationLang === ALL) return Object.values(w.translations).join(' · ');
+    if (w.language === translationLang) return null;
+    return w.translations[translationLang] ?? '';
+  };
+
+  const nextReview = (w: Word) => {
+    if (w.review === false) return { label: 'off', due: false };
+    if (index.isDue(w)) return { label: 'due', due: true };
+    if (!w.review.due) return { label: 'new', due: false };
+    const days = daysBetween(index.today, w.review.due);
+    return { label: days === 1 ? 'tomorrow' : `${days} days`, due: false };
+  };
+
+  const listed = useMemo(() => {
+    const key = (w: Word): string => {
+      if (sort.key === 'translation') return translationOf(w) ?? '';
+      if (sort.key === 'created') return w.created;
+      if (sort.key === 'review') return w.review === false ? '9999' : (w.review.due ?? '0000');
+      return w.word;
+    };
+    return [...shown].sort((a, b) => {
+      const ka = key(a);
+      const kb = key(b);
+      // Words without a translation sink to the bottom whichever way the column is sorted.
+      if (sort.key === 'translation' && !ka !== !kb) return ka ? -1 : 1;
+      return sort.dir * ka.localeCompare(kb, undefined, { sensitivity: 'base' });
+    });
+  }, [shown, sort, translationLang]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const togglePos = (p: PartOfSpeech) =>
     setPosFilter((s) => {
       const next = new Set(s);
@@ -88,6 +133,8 @@ export function DictionaryView({ index, theme, selectedWord, field, onOpenWord, 
     setQuery('');
     if (field) onSetField(undefined);
   };
+  const sortBy = (key: SortKey) => setSort((s) => ({ key, dir: s.key === key ? (s.dir === 1 ? -1 : 1) : key === 'created' ? -1 : 1 }));
+  const sortMark = (key: SortKey) => (sort.key === key ? (sort.dir === 1 ? ' ↑' : ' ↓') : '');
 
   if (index.words.length === 0) {
     return (
@@ -106,6 +153,48 @@ export function DictionaryView({ index, theme, selectedWord, field, onOpenWord, 
   }
 
   const fields = [...index.fieldCounts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+  const langName = (code: string) => byCode.get(code)?.name ?? (code === 'other' ? 'Other' : code);
+  const translationPicker = (
+    <select className="input lang-pick" aria-label="Translation language" value={translationLang} onChange={(e) => setTranslationLang(e.target.value)}>
+      {translationLangs.map((code) => (
+        <option key={code} value={code}>
+          {langName(code)}
+        </option>
+      ))}
+      <option value={ALL}>All languages</option>
+    </select>
+  );
+  const translationCell = (w: Word, stacked = false) => {
+    if (translationLang === ALL && stacked) {
+      // One line per language, in the same order as the picker, each tagged with its code.
+      const order = (code: string) => (translationLangs.indexOf(code) + 1 || 999);
+      const entries = Object.entries(w.translations)
+        .filter(([, text]) => text)
+        .sort(([a], [b]) => order(a) - order(b));
+      if (!entries.length) return <span className="muted small">none yet</span>;
+      return (
+        <span className="tr-lines">
+          {entries.map(([code, text]) => (
+            <span key={code} className="tr-line">
+              <abbr className="tr-code" title={langName(code)}>
+                {code === 'other' ? '…' : code}
+              </abbr>
+              <span {...textProps(text, code)}>{text}</span>
+            </span>
+          ))}
+        </span>
+      );
+    }
+    const t = translationOf(w);
+    if (t === null)
+      return (
+        <span className="muted" title={`Already in ${langName(translationLang)}`}>
+          —
+        </span>
+      );
+    if (!t) return <span className="muted small">none yet</span>;
+    return <span {...(translationLang === ALL ? {} : textProps(t, translationLang))}>{t}</span>;
+  };
 
   return (
     <div className="dictionary">
@@ -119,11 +208,11 @@ export function DictionaryView({ index, theme, selectedWord, field, onOpenWord, 
             </button>
           )}
         </label>
-        <button type="button" className={`btn dict-toggle ${filtersOpen ? 'on' : ''}`} aria-expanded={filtersOpen} onClick={() => setFiltersOpen(!filtersOpen)}>
+        <button type="button" className={`btn dict-toggle ${filtersOpen === '1' ? 'on' : ''}`} aria-expanded={filtersOpen === '1'} onClick={() => setFiltersOpen(filtersOpen === '1' ? '0' : '1')}>
           Filters
           {activeFilters > 0 && <span className="chip-count">{activeFilters}</span>}
         </button>
-        <button type="button" className={`btn dict-toggle ${listOpen ? 'on' : ''}`} aria-expanded={listOpen} onClick={() => setListOpen(!listOpen)}>
+        <button type="button" className={`btn dict-toggle ${listMode !== 'off' ? 'on' : ''}`} aria-expanded={listMode !== 'off'} onClick={() => setListMode(listMode === 'off' ? 'side' : 'off')}>
           List
           <span className="chip-count">{shown.length}</span>
         </button>
@@ -132,7 +221,7 @@ export function DictionaryView({ index, theme, selectedWord, field, onOpenWord, 
         </button>
       </div>
 
-      {filtersOpen && (
+      {filtersOpen === '1' && (
         <div className="dict-filters">
           <div className="filter-group">
             <span className="filter-label">Part of speech</span>
@@ -153,7 +242,7 @@ export function DictionaryView({ index, theme, selectedWord, field, onOpenWord, 
                   .sort((a, b) => b[1] - a[1])
                   .map(([code, n]) => (
                     <button key={code} type="button" className={`chip plain ${language === code ? 'on' : ''}`} aria-pressed={language === code} onClick={() => setLanguage(language === code ? null : code)}>
-                      {index.languages.byCode.get(code)?.native ?? code}
+                      {byCode.get(code)?.native ?? code}
                       <span className="chip-count">{n}</span>
                     </button>
                   ))}
@@ -191,18 +280,20 @@ export function DictionaryView({ index, theme, selectedWord, field, onOpenWord, 
         </div>
       )}
 
-      <div className={`dict-main ${listOpen ? 'with-list' : ''}`}>
-        <WordWheel
-          words={shown}
-          edges={edges}
-          isDue={index.isDue}
-          theme={theme}
-          selected={selectedWord}
-          activeLetter={letter}
-          onLetter={(l) => setLetter(letter === l ? null : l)}
-          onOpen={onOpenWord}
-          onBackground={onBackground}
-        />
+      <div className={`dict-main ${listMode === 'side' ? 'with-list' : ''} ${listMode === 'full' ? 'list-full' : ''}`}>
+        {listMode !== 'full' && (
+          <WordWheel
+            words={shown}
+            edges={edges}
+            isDue={index.isDue}
+            theme={theme}
+            selected={selectedWord}
+            activeLetter={letter}
+            onLetter={(l) => setLetter(letter === l ? null : l)}
+            onOpen={onOpenWord}
+            onBackground={onBackground}
+          />
+        )}
         {shown.length === 0 && (
           <div className="dict-nomatch">
             <p className="muted">No words match.</p>
@@ -211,34 +302,124 @@ export function DictionaryView({ index, theme, selectedWord, field, onOpenWord, 
             </button>
           </div>
         )}
-        {listOpen && (
+        {listMode !== 'off' && (
           <aside className="word-sheet" aria-label="Word list">
             <div className="word-sheet-head">
-              <span>
-                {shown.length === index.words.length ? 'All words' : `${shown.length} of ${index.words.length} words`}
-              </span>
-              <button type="button" className="icon-btn" aria-label="Hide list" onClick={() => setListOpen(false)}>
+              <span className="word-sheet-title">{shown.length === index.words.length ? `${shown.length} words` : `${shown.length} of ${index.words.length}`}</span>
+              {translationPicker}
+              <button
+                type="button"
+                className="icon-btn"
+                aria-label={listMode === 'full' ? 'Show the wheel' : 'Full screen list'}
+                title={listMode === 'full' ? 'Show the wheel' : 'Full screen list'}
+                onClick={() => setListMode(listMode === 'full' ? 'side' : 'full')}
+              >
+                <Icon name={listMode === 'full' ? 'collapse' : 'expand'} size={16} />
+              </button>
+              <button type="button" className="icon-btn" aria-label="Hide list" title="Hide list" onClick={() => setListMode('off')}>
                 <Icon name="close" size={16} />
               </button>
             </div>
-            <ul className="word-list">
-              {shown.map((w) => (
-                <li key={w.id}>
-                  <button type="button" className={`word-row ${selectedWord === w.id ? 'selected' : ''}`} onClick={() => onOpenWord(w.id)} aria-current={selectedWord === w.id ? 'true' : undefined}>
-                    <span className="dot" style={{ background: posColor(w.pos, theme) }} />
-                    <span className="word-row-text">
-                      <span className="word-row-word">
-                        <span {...textProps(w.word, w.language)}>{w.word}</span> <em className="pos">{w.pos}</em>
-                        {index.isDue(w) && <span className="due-mark" title="Due for review" />}
+
+            {listMode === 'full' ? (
+              <div className="word-table-wrap">
+                <table className="word-table">
+                  <thead>
+                    <tr>
+                      <th>
+                        <button type="button" onClick={() => sortBy('word')}>
+                          Word{sortMark('word')}
+                        </button>
+                      </th>
+                      <th>
+                        <button type="button" onClick={() => sortBy('translation')}>
+                          {translationLang === ALL ? 'Translations' : langName(translationLang)}
+                          {sortMark('translation')}
+                        </button>
+                      </th>
+                      <th>Meaning</th>
+                      <th className="wt-pos">Part of speech</th>
+                      <th className="wt-fields">Fields</th>
+                      <th className="wt-date">
+                        <button type="button" onClick={() => sortBy('created')}>
+                          Added{sortMark('created')}
+                        </button>
+                      </th>
+                      <th>
+                        <button type="button" onClick={() => sortBy('review')}>
+                          Review{sortMark('review')}
+                        </button>
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {listed.map((w) => {
+                      const r = nextReview(w);
+                      return (
+                        <tr key={w.id} className={selectedWord === w.id ? 'selected' : ''} onClick={() => onOpenWord(w.id)}>
+                          <td className="wt-word" data-label="Word">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onOpenWord(w.id);
+                              }}
+                            >
+                              <span className="dot" style={{ background: posColor(w.pos, theme) }} />
+                              <span {...textProps(w.word, w.language)}>{w.word}</span>
+                            </button>
+                            {w.pronunciation && <span className="wt-sub">{w.pronunciation}</span>}
+                          </td>
+                          <td className="wt-translation" data-label={translationLang === ALL ? 'Translations' : langName(translationLang)}>
+                            {translationCell(w, true)}
+                          </td>
+                          <td className="wt-meaning" data-label="Meaning">
+                            <span {...textProps(w.definition, w.language)}>{w.definition}</span>
+                          </td>
+                          <td className="wt-pos" data-label="Part of speech">
+                            <em className="pos">{w.pos}</em>
+                          </td>
+                          <td className="wt-fields" data-label="Fields">
+                            {w.fields.join(', ') || <span className="muted">—</span>}
+                          </td>
+                          <td className="wt-date" data-label="Added">
+                            {new Date(`${w.created}T12:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                          </td>
+                          <td className="wt-review" data-label="Review">
+                            <span className={r.due ? 'due-text' : 'muted'}>
+                              {r.due && <span className="due-mark" />}
+                              {r.label}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <ul className="word-list">
+                {listed.map((w) => (
+                  <li key={w.id}>
+                    <button type="button" className={`word-row ${selectedWord === w.id ? 'selected' : ''}`} onClick={() => onOpenWord(w.id)} aria-current={selectedWord === w.id ? 'true' : undefined}>
+                      <span className="dot" style={{ background: posColor(w.pos, theme) }} />
+                      <span className="word-row-text">
+                        <span className="word-row-line">
+                          <span className="word-row-word">
+                            <span {...textProps(w.word, w.language)}>{w.word}</span> <em className="pos">{w.pos}</em>
+                            {index.isDue(w) && <span className="due-mark" title="Due for review" />}
+                          </span>
+                          <span className="word-row-translation">{translationCell(w)}</span>
+                        </span>
+                        <span className="word-row-def" {...textProps(w.definition, w.language)}>
+                          {w.definition}
+                        </span>
                       </span>
-                      <span className="word-row-def" {...textProps(w.definition, w.language)}>
-                        {w.definition}
-                      </span>
-                    </span>
-                  </button>
-                </li>
-              ))}
-            </ul>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
           </aside>
         )}
       </div>

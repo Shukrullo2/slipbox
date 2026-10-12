@@ -1786,7 +1786,7 @@ textarea.input {
   grid-template-columns: 1fr;
 }
 .dict-main.with-list {
-  grid-template-columns: 300px 1fr;
+  grid-template-columns: 360px 1fr;
 }
 .dict-main.with-list .wheel {
   order: 2;
@@ -1801,13 +1801,24 @@ textarea.input {
 .word-sheet-head {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 8px 8px 6px 14px;
+  gap: 6px;
+  padding: 6px 6px 6px 14px;
   font-size: 12.5px;
   font-weight: 650;
   color: var(--ink-2);
   border-bottom: 1px solid var(--line);
 }
+.word-sheet-title {
+  flex: 1;
+  white-space: nowrap;
+}
+.lang-pick {
+  width: auto;
+  padding: 3px 6px;
+  font-size: 12.5px;
+}
+
+/* side list: word and translation on one line, meaning under them */
 .word-list {
   list-style: none;
   margin: 0;
@@ -1834,11 +1845,30 @@ textarea.input {
   display: grid;
   gap: 1px;
   min-width: 0;
+  flex: 1;
+}
+.word-row-line {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
 }
 .word-row-word {
   font-weight: 600;
   font-variation-settings: 'CASL' 1;
   line-height: 1.3;
+  min-width: 0;
+}
+.word-row-translation {
+  flex: 0 1 45%;
+  min-width: 0;
+  text-align: right;
+  font-size: 13.5px;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .pos {
   margin-left: 6px;
@@ -1853,9 +1883,139 @@ textarea.input {
   line-height: 1.4;
   overflow: hidden;
   display: -webkit-box;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 1;
   -webkit-box-orient: vertical;
 }
+
+/* full-screen list: a table over the whole view */
+.dict-main.list-full .word-sheet {
+  border-right: 0;
+  background: var(--surface);
+}
+.word-table-wrap {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+.word-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+.word-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 0;
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--line-strong);
+  text-align: left;
+  font-size: 12.5px;
+  font-weight: 650;
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+.word-table th > button {
+  display: block;
+  width: 100%;
+  padding: 8px 12px;
+  text-align: left;
+}
+.word-table th:not(:has(button)) {
+  padding: 8px 12px;
+}
+.word-table th > button:hover {
+  color: var(--ink);
+}
+.word-table td {
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--rule-blue);
+  vertical-align: top;
+  line-height: 1.45;
+}
+.word-table tbody tr {
+  cursor: pointer;
+}
+.word-table tbody tr:hover,
+.word-table tbody tr.selected {
+  background: var(--hover);
+}
+.wt-word {
+  min-width: 140px;
+}
+.wt-word button {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  font-weight: 650;
+  font-variation-settings: 'CASL' 1;
+  text-align: left;
+}
+.wt-word .dot {
+  transform: translateY(-1px);
+}
+.wt-sub {
+  display: block;
+  margin-left: 16px;
+  font-size: 12px;
+  color: var(--ink-2);
+}
+.wt-translation {
+  min-width: 140px;
+  max-width: 240px;
+}
+.wt-meaning {
+  color: var(--ink-2);
+  min-width: 220px;
+}
+.wt-pos,
+.wt-date,
+.wt-review {
+  white-space: nowrap;
+}
+.wt-pos .pos {
+  margin-left: 0;
+}
+.wt-fields,
+.wt-date,
+.wt-review {
+  font-size: 13px;
+  color: var(--ink-2);
+}
+.tr-lines {
+  display: grid;
+  gap: 3px;
+}
+.tr-line {
+  display: flex;
+  gap: 7px;
+  align-items: baseline;
+}
+.tr-code {
+  flex: none;
+  min-width: 18px;
+  font-size: 10.5px;
+  font-weight: 650;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  text-decoration: none;
+  color: var(--ink-2);
+}
+.due-text {
+  color: var(--red);
+  font-weight: 600;
+}
+/* Leave room for the word card when it is open beside the table. */
+@media (min-width: 1100px) {
+  .has-panel .dict-main.list-full .word-sheet {
+    margin-right: min(568px, 50%); /* card width 540 + its 14px inset + a 14px gap */
+  }
+  /* With the card open, keep the columns that matter and drop the rest. */
+  .has-panel .dict-main.list-full :is(.wt-pos, .wt-fields, .wt-date) {
+    display: none;
+  }
+}
+
 .dict-nomatch {
   position: absolute;
   inset: 0;
@@ -2274,6 +2434,74 @@ textarea.input {
   }
   .dict-main.with-list .wheel {
     order: 0;
+  }
+  .dict-main.list-full .word-sheet {
+    position: static;
+    max-height: none;
+    border-radius: 0;
+    border-top: 0;
+    box-shadow: none;
+  }
+  .lang-pick {
+    max-width: 120px;
+  }
+  /* The table becomes one card per word. */
+  .word-table thead {
+    display: none;
+  }
+  .word-table,
+  .word-table tbody,
+  .word-table tr,
+  .word-table td {
+    display: block;
+    width: 100%;
+  }
+  .word-table tr {
+    display: grid;
+    /* the word takes what it needs (up to about half), the translation gets the rest */
+    grid-template-columns: fit-content(55%) minmax(0, 1fr);
+    gap: 2px 12px;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--rule-blue);
+  }
+  .word-table td {
+    padding: 0;
+    border: 0;
+    min-width: 0;
+    max-width: none;
+  }
+  .wt-word {
+    grid-column: 1;
+  }
+  .wt-translation {
+    grid-column: 2;
+    grid-row: 1;
+    text-align: right;
+    font-size: 14px;
+    line-height: 1.35;
+    padding-top: 1px !important;
+  }
+  .wt-translation .tr-line {
+    justify-content: flex-end;
+  }
+  .wt-meaning,
+  .wt-fields {
+    grid-column: 1 / -1;
+  }
+  .wt-meaning {
+    font-size: 13.5px;
+  }
+  .wt-pos,
+  .wt-date {
+    display: none !important;
+  }
+  .wt-review {
+    grid-column: 1 / -1;
+    font-size: 12px;
+  }
+  .wt-fields:empty,
+  .wt-fields:has(> .muted:only-child) {
+    display: none;
   }
   .word-sheet {
     position: absolute;
